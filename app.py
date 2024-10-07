@@ -1,11 +1,12 @@
 from requests.exceptions import RequestException
 from contextlib import closing
 from requests import get
-from io import StringIO
+from io import StringIO, BytesIO
 from bs4 import BeautifulSoup
 import pandas as pd
+from flask import Flask, request, send_file
 
-
+app = Flask(__name__)
 
 # Function to scrape the table from a webpage and convert it to DataFrame
 def scrape_tn_stats(link: str) -> pd.DataFrame:
@@ -80,3 +81,25 @@ def is_good_response(resp):#verifie la validite de la page web
             and content_type.find('html') > -1)
 
 
+# Flask route to handle the CSV request
+@app.route('/get_csv', methods=['GET'])
+def get_csv():
+    url = request.args.get('url')
+    if not url:
+        return "No URL provided", 400
+    print(url)
+
+    # Get the CSV buffer
+    tn_stats = scrape_tn_stats(url)
+    
+    # Convert the DataFrame to a CSV
+    csv_buffer = BytesIO()
+    tn_stats.to_csv(csv_buffer, index=False)
+    csv_buffer.seek(0)  # Move to the start of the buffer
+    
+    # Send the CSV file as a download
+    return send_file(csv_buffer, mimetype='text/csv', as_attachment=True, download_name='data.csv')
+
+# Vercel requires the app to be exposed as 'app'
+if __name__ == "__main__":
+    app.run(debug=True)
